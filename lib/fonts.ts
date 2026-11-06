@@ -1,0 +1,10 @@
+import { Tajawal, Cairo, Almarai, IBM_Plex_Sans_Arabic, Readex_Pro, El_Messiri } from "next/font/google";
+import type { FontKey } from "./types";
+const tajawal = Tajawal({ subsets: ["arabic"], weight: ["400", "500", "700"], variable: "--f-tajawal", display: "swap", adjustFontFallback: false });
+const cairo = Cairo({ subsets: ["arabic"], weight: ["400", "600", "700", "800"], variable: "--f-cairo", display: "swap", adjustFontFallback: false, preload: false });
+const almarai = Almarai({ subsets: ["arabic"], weight: ["400", "700", "800"], variable: "--f-almarai", display: "swap", adjustFontFallback: false, preload: false });
+const ibmplex = IBM_Plex_Sans_Arabic({ subsets: ["arabic"], weight: ["400", "500", "700"], variable: "--f-ibmplex", display: "swap", adjustFontFallback: false });
+const readex = Readex_Pro({ subsets: ["arabic"], weight: ["400", "600", "700"], variable: "--f-readex", display: "swap", adjustFontFallback: false });
+const elmessiri = El_Messiri({ subsets: ["arabic"], weight: ["500", "600", "700"], variable: "--f-elmessiri", display: "swap", adjustFontFallback: false });
+export const fontVars = [tajawal, cairo, almarai, ibmplex, readex, elmessiri].map((f) => f.variable).join(" ");
+export const fontVar = (k: FontKey) => `var(--f-${k || "tajawal"})`;

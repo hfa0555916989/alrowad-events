@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import { upload } from "@vercel/blob/client";
-import type { Content, Item, Media } from "../lib/types";
+import type { Content, Item, Media, FontKey } from "../lib/types";
+import { FONT_OPTIONS } from "../lib/fontOptions";
 
 type Tab = "seo" | "identity" | "media" | "content" | "lists";
 const TABS: [Tab, string][] = [["seo", "السيو SEO"], ["identity", "الهوية والشعار"], ["media", "الصور والفيديو"], ["content", "النصوص والتواصل"], ["lists", "الخدمات والمدن والمشاريع"]];
@@ -83,7 +84,7 @@ function ItemList({ items, set, withImage, folder }: { items: Item[]; set: (m: I
   );
 }
 
-const TITLE_LABELS: Record<string, string> = { about: "من نحن", services: "الخدمات", cities: "المدن", projects: "المشاريع", why: "لماذا نحن", gallery: "معرض الصور", videos: "الفيديوهات", contact: "تواصل معنا", callNow: "زر الاتصال في الأعلى" };
+const TITLE_LABELS: Record<string, string> = { about: "من نحن", services: "الخدمات", cities: "المدن", projects: "المشاريع", why: "لماذا نحن", stats: "الأرقام", testimonials: "آراء العملاء", gallery: "معرض الصور", videos: "الفيديوهات", contact: "تواصل معنا", callNow: "زر الاتصال في الأعلى" };
 
 export default function Dashboard({ initial, blobReady }: { initial: Content; blobReady: boolean }) {
   const [c, setC] = useState<Content>(initial);
@@ -134,12 +135,13 @@ export default function Dashboard({ initial, blobReady }: { initial: Content; bl
                 <F key={k} label={l}><input type="color" className="w-full h-10" value={i[k]} onChange={(e) => up("identity", { [k]: e.target.value })} /></F>
               ))}
             </div>
-            <F label="الخط"><select className="inp" value={i.font} onChange={(e) => up("identity", { font: e.target.value as "tajawal" | "cairo" })}><option value="tajawal">Tajawal - تجوال</option><option value="cairo">Cairo - القاهرة</option></select></F>
+            <F label="خط النصوص"><select className="inp" value={i.font} onChange={(e) => up("identity", { font: e.target.value as FontKey })}>{FONT_OPTIONS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></F>
+            <F label="خط العناوين"><select className="inp" value={i.headingFont} onChange={(e) => up("identity", { headingFont: e.target.value as FontKey })}>{FONT_OPTIONS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></F>
           </>)}
           {tab === "media" && (<>
             <h3 className="font-bold mb-2">معرض الصور (أي مقاس وأي صيغة)</h3>
             <MediaList kind="image" items={c.gallery} set={(m) => up("gallery", m)} />
-            <h3 className="font-bold mt-8 mb-2">الفيديوهات (بدون حد للحجم تقريباً — رفع مباشر)</h3>
+            <h3 className="font-bold mt-8 mb-2">الفيديوهات (رفع مباشر لأي حجم — يختفي القسم تلقائياً إذا كان فارغاً)</h3>
             <MediaList kind="video" items={c.videos} set={(m) => up("videos", m)} />
             <ImgField label="صورة خلفية الواجهة الرئيسية" folder="hero" v={c.hero.image} on={(s) => up("hero", { image: s })} />
           </>)}
@@ -149,7 +151,15 @@ export default function Dashboard({ initial, blobReady }: { initial: Content; bl
             <F label="العنوان الرئيسي"><T v={c.hero.title} on={(s) => up("hero", { title: s })} /></F>
             <F label="النص التعريفي"><T area v={c.hero.subtitle} on={(s) => up("hero", { subtitle: s })} /></F>
             <F label="نص الزر"><T v={c.hero.cta} on={(s) => up("hero", { cta: s })} /></F>
-            <F label="من نحن"><T area v={c.about.text} on={(s) => up("about", { text: s })} /></F>
+            <h3 className="font-bold mt-6 mb-3">من نحن</h3>
+            <F label="عنوان قسم من نحن"><T v={c.about.title} on={(s) => up("about", { title: s })} /></F>
+            <F label="نص من نحن"><T area v={c.about.text} on={(s) => up("about", { text: s })} /></F>
+            <F label="نقاط مميزة (كل سطر نقطة)"><T area v={c.about.points} on={(s) => up("about", { points: s })} /></F>
+            <ImgField label="صورة / خلفية قسم من نحن" folder="about" v={c.about.image} on={(s) => up("about", { image: s })} />
+            <h3 className="font-bold mt-6 mb-3">شريط الدعوة للحجز (CTA)</h3>
+            <F label="العنوان"><T v={c.cta.title} on={(s) => up("cta", { title: s })} /></F>
+            <F label="النص"><T area v={c.cta.text} on={(s) => up("cta", { text: s })} /></F>
+            <ImgField label="صورة الخلفية" folder="cta" v={c.cta.image} on={(s) => up("cta", { image: s })} />
             <h3 className="font-bold mt-6 mb-3">التواصل</h3>
             <F label="رقم الاتصال"><T v={c.contact.phone} on={(s) => up("contact", { phone: s })} /></F>
             <F label="رقم الواتساب"><T v={c.contact.whatsapp} on={(s) => up("contact", { whatsapp: s })} /></F>
@@ -160,13 +170,15 @@ export default function Dashboard({ initial, blobReady }: { initial: Content; bl
             {(Object.keys(c.social) as (keyof Content["social"])[]).map((k) => <F key={k} label={k}><T v={c.social[k]} on={(s) => up("social", { [k]: s })} /></F>)}
             <F label="نص التذييل (Footer)"><T v={c.footer.text} on={(s) => up("footer", { text: s })} /></F>
             <h3 className="font-bold mt-6 mb-3">إظهار / إخفاء الأقسام</h3>
-            <div className="flex flex-wrap gap-4">{["about", "services", "cities", "projects", "why", "gallery", "videos"].map((k) => <label key={k} className="flex gap-1"><input type="checkbox" checked={c.sections[k] !== false} onChange={(e) => up("sections", { [k]: e.target.checked })} />{TITLE_LABELS[k]}</label>)}</div>
+            <div className="flex flex-wrap gap-4">{["about", "stats", "services", "cities", "projects", "why", "gallery", "videos", "testimonials"].map((k) => <label key={k} className="flex gap-1"><input type="checkbox" checked={c.sections[k] !== false} onChange={(e) => up("sections", { [k]: e.target.checked })} />{TITLE_LABELS[k]}</label>)}</div>
           </>)}
           {tab === "lists" && (<>
             <h3 className="font-bold mb-3">الخدمات</h3><ItemList folder="services" withImage items={c.services} set={(m) => up("services", m)} />
             <h3 className="font-bold mt-8 mb-3">المدن / مناطق الخدمة</h3><ItemList folder="cities" items={c.cities} set={(m) => up("cities", m)} />
             <h3 className="font-bold mt-8 mb-3">المشاريع</h3><ItemList folder="projects" withImage items={c.projects} set={(m) => up("projects", m)} />
             <h3 className="font-bold mt-8 mb-3">لماذا نحن</h3><ItemList folder="why" items={c.why} set={(m) => up("why", m)} />
+            <h3 className="font-bold mt-8 mb-3">الأرقام والإحصائيات (العنوان = الرقم مثل 500+، الوصف = التسمية)</h3><ItemList folder="stats" items={c.stats} set={(m) => up("stats", m)} />
+            <h3 className="font-bold mt-8 mb-3">آراء العملاء (العنوان = اسم العميل، الوصف = الرأي)</h3><ItemList folder="testimonials" items={c.testimonials} set={(m) => up("testimonials", m)} />
           </>)}
         </div>
         <button onClick={save} className="mt-4 w-full bg-yellow-500 font-bold rounded py-3">💾 حفظ التغييرات</button>

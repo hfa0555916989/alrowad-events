@@ -1,10 +1,30 @@
 @import "tailwindcss";
-:root { --primary:#c9a24a; --secondary:#6b4226; --bg:#0f0b08; --surface:#1b140f; --text:#f5ecd9; --logo-d:72px; --logo-m:48px; }
-html { scroll-behavior: smooth; }
-body { background: var(--bg); color: var(--text); }
+:root { --primary:#c9a24a; --secondary:#7a4b2a; --bg:#0e0907; --surface:#18110c; --text:#f6ecd8; --logo-d:64px; --logo-m:44px; --body: system-ui; --heading: system-ui; }
+html { scroll-behavior: smooth; scroll-padding-top: 90px; }
+body { background: var(--bg); color: var(--text); font-family: var(--body); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, .display { font-family: var(--heading); }
 .logo { height: var(--logo-m); width: auto; }
 @media (min-width: 768px) { .logo { height: var(--logo-d); } }
 .gold { color: var(--primary); }
-.btn { background: var(--primary); color: var(--bg); border-radius: 9999px; padding: .75rem 1.75rem; font-weight: 700; display:inline-block; }
-.card { background: var(--surface); border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent); border-radius: 1rem; }
+.gold-grad { background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 70%, #fff) 0%, var(--primary) 45%, color-mix(in srgb, var(--primary) 70%, #000) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.btn { background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 80%, #fff), var(--primary)); color: #111; border-radius: 9999px; padding: .85rem 1.9rem; font-weight: 700; display:inline-flex; align-items:center; gap:.5rem; box-shadow: 0 10px 30px -10px color-mix(in srgb, var(--primary) 70%, transparent); transition: transform .2s, box-shadow .2s; }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 14px 34px -8px color-mix(in srgb, var(--primary) 80%, transparent); }
+.btn-ghost { border:1px solid color-mix(in srgb, var(--primary) 60%, transparent); border-radius: 9999px; padding: .85rem 1.9rem; font-weight: 700; display:inline-flex; align-items:center; gap:.5rem; backdrop-filter: blur(6px); background: rgba(255,255,255,.04); transition: background .2s; }
+.btn-ghost:hover { background: color-mix(in srgb, var(--primary) 15%, transparent); }
+.card { background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, #fff 8%), var(--surface)); border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent); border-radius: 1.25rem; }
+.v-golden .card, .v-golden .btn, .v-golden .btn-ghost { border-radius: .35rem; }
+.v-golden .cut { clip-path: polygon(0 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%); }
+.eyebrow { display:inline-flex; align-items:center; gap:.5rem; font-size:.8rem; letter-spacing:.08em; font-weight:700; color: var(--primary); text-transform: uppercase; }
+.eyebrow::before, .eyebrow::after { content:""; width:28px; height:1px; background: var(--primary); opacity:.7; }
+.icon-chip { width:3.25rem; height:3.25rem; display:grid; place-items:center; border-radius: 1rem; background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); border:1px solid color-mix(in srgb, var(--primary) 30%, transparent); }
+.v-golden .icon-chip { border-radius:.35rem; }
+.pattern { background-image: radial-gradient(color-mix(in srgb, var(--primary) 16%, transparent) 1px, transparent 1px); background-size: 22px 22px; }
+.v-golden .pattern { background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--primary) 7%, transparent) 0 2px, transparent 2px 18px); background-size: auto; }
+.reveal { opacity: 0; transform: translateY(26px); transition: opacity .8s cubic-bezier(.2,.7,.2,1), transform .8s cubic-bezier(.2,.7,.2,1); }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity:1; transform:none; transition:none; } html { scroll-behavior:auto; } }
+.zoom img { transition: transform 1s cubic-bezier(.2,.7,.2,1); }
+.zoom:hover img { transform: scale(1.06); }
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(37,211,102,.55);} 70% { box-shadow: 0 0 0 16px rgba(37,211,102,0);} 100% { box-shadow: 0 0 0 0 rgba(37,211,102,0);} }
+.wa-pulse { animation: pulse-ring 2.2s infinite; }
 .inp { width:100%; background:#fff; color:#111; border:1px solid #ccc; border-radius:.5rem; padding:.5rem .75rem; }

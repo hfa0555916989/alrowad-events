@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
-import { Tajawal, Cairo } from "next/font/google";
 import "./globals.css";
 import { getContent } from "../lib/store";
 import { siteUrl } from "../lib/url";
 
-const tajawal = Tajawal({ subsets: ["arabic"], weight: ["400", "500", "700", "800"], variable: "--f-tajawal" });
-const cairo = Cairo({ subsets: ["arabic"], weight: ["400", "600", "700", "800"], variable: "--f-cairo" });
+import { fontVars, fontVar } from "../lib/fonts";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -31,10 +29,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const style = {
     "--primary": i.primary, "--secondary": i.secondary, "--bg": i.background, "--surface": i.surface, "--text": i.text,
     "--logo-d": `${i.logoSizeDesktop}px`, "--logo-m": `${i.logoSizeMobile}px`,
-    fontFamily: i.font === "cairo" ? "var(--f-cairo)" : "var(--f-tajawal)",
+    "--body": fontVar(i.font), "--heading": fontVar(i.headingFont || i.font),
   } as React.CSSProperties;
   return (
-    <html lang="ar" dir="rtl" className={`${tajawal.variable} ${cairo.variable}`}>
+    <html lang="ar" dir="rtl" className={fontVars}>
       <body style={style}>{children}</body>
     </html>
   );
