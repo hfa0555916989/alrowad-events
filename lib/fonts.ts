@@ -1,10 +1,13 @@
-import { Tajawal, Cairo, Almarai, IBM_Plex_Sans_Arabic, Readex_Pro, El_Messiri } from "next/font/google";
 import type { FontKey } from "./types";
-const tajawal = Tajawal({ subsets: ["arabic"], weight: ["400", "500", "700"], variable: "--f-tajawal", display: "swap", adjustFontFallback: false });
-const cairo = Cairo({ subsets: ["arabic"], weight: ["400", "600", "700", "800"], variable: "--f-cairo", display: "swap", adjustFontFallback: false, preload: false });
-const almarai = Almarai({ subsets: ["arabic"], weight: ["400", "700", "800"], variable: "--f-almarai", display: "swap", adjustFontFallback: false, preload: false });
-const ibmplex = IBM_Plex_Sans_Arabic({ subsets: ["arabic"], weight: ["400", "500", "700"], variable: "--f-ibmplex", display: "swap", adjustFontFallback: false });
-const readex = Readex_Pro({ subsets: ["arabic"], weight: ["400", "600", "700"], variable: "--f-readex", display: "swap", adjustFontFallback: false });
-const elmessiri = El_Messiri({ subsets: ["arabic"], weight: ["500", "600", "700"], variable: "--f-elmessiri", display: "swap", adjustFontFallback: false });
-export const fontVars = [tajawal, cairo, almarai, ibmplex, readex, elmessiri].map((f) => f.variable).join(" ");
-export const fontVar = (k: FontKey) => `var(--f-${k || "tajawal"})`;
+const F: Record<FontKey, [string, string]> = {
+  tajawal: ["Tajawal", "Tajawal:wght@400;500;700"],
+  cairo: ["Cairo", "Cairo:wght@400;600;700;800"],
+  almarai: ["Almarai", "Almarai:wght@400;700;800"],
+  ibmplex: ["IBM Plex Sans Arabic", "IBM+Plex+Sans+Arabic:wght@400;500;700"],
+  readex: ["Readex Pro", "Readex+Pro:wght@400;600;700"],
+  elmessiri: ["El Messiri", "El+Messiri:wght@500;600;700"],
+};
+const get = (k: FontKey) => F[k] || F.tajawal;
+export const fontVar = (k: FontKey) => `'${get(k)[0]}', system-ui, sans-serif`;
+export const fontsHref = (...keys: FontKey[]) =>
+  "https://fonts.googleapis.com/css2?" + [...new Set(keys.map((k) => get(k)[1]))].map((q) => "family=" + q).join("&") + "&display=swap";

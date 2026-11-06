@@ -3,7 +3,7 @@ import "./globals.css";
 import { getContent } from "../lib/store";
 import { siteUrl } from "../lib/url";
 
-import { fontVars, fontVar } from "../lib/fonts";
+import { fontVar, fontsHref } from "../lib/fonts";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -32,7 +32,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     "--body": fontVar(i.font), "--heading": fontVar(i.headingFont || i.font),
   } as React.CSSProperties;
   return (
-    <html lang="ar" dir="rtl" className={fontVars}>
+    <html lang="ar" dir="rtl">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="stylesheet" href={fontsHref(i.font, i.headingFont || i.font)} />
+      </head>
       <body style={style}>{children}</body>
     </html>
   );
