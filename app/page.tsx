@@ -1,12 +1,13 @@
 import Image from "next/image";
 import { getContent } from "../lib/store";
-import { intl, siteUrl } from "../lib/url";
+import type { Metadata } from "next";
+import { pageMeta, crumbsLd, ld } from "../lib/seo";
 import { VARIANT } from "../lib/site";
-import type { Item } from "../lib/types";
-import Reveal from "../components/Reveal";
 import Counter from "../components/Counter";
-import MobileNav from "../components/MobileNav";
+import Shell from "../components/Shell";
+import ServiceCards from "../components/ServiceCards";
 import { WhatsAppIcon, Divider } from "../components/Brand";
+import { links } from "../components/Shell";
 import {
   Coffee, Users, PartyPopper, Gem, Sparkles, Pickaxe, Building2, Shovel, Truck, Route, MapPin, Award, Clock, ShieldCheck,
   BadgePercent, Phone, Mail, Quote, Star, CheckCircle2, ArrowLeft, HardHat, Wrench, Globe, AtSign, Camera, Music2, Share2,
@@ -17,7 +18,6 @@ export const revalidate = 0;
 
 const SERVICE_ICONS = VARIANT === "golden" ? [Pickaxe, Building2, Shovel, Truck, Route, HardHat, Wrench] : [Coffee, Users, PartyPopper, Gem, Sparkles, Coffee, Users];
 const WHY_ICONS = VARIANT === "golden" ? [Award, Truck, ShieldCheck, Clock, HardHat, Wrench] : [Award, Clock, Gem, BadgePercent, ShieldCheck, Sparkles];
-const SOCIAL_ICONS: Record<string, typeof Globe> = { instagram: Camera, x: AtSign, snapchat: Share2, tiktok: Music2, facebook: Globe };
 
 function Head({ eyebrow, title, light }: { eyebrow?: string; title: string; light?: boolean }) {
   return (
@@ -32,70 +32,21 @@ function Img({ src, alt, className, sizes, priority }: { src: string; alt: strin
   if (!src) return null;
   return <Image src={src} alt={alt} fill sizes={sizes} priority={priority} className={className ?? "object-cover"} />;
 }
-function PhotoCards({ items, icons, sizes }: { items: Item[]; icons: typeof SERVICE_ICONS; sizes: string }) {
-  return (
-    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      {items.map((s, i) => {
-        const Icon = icons[i % icons.length];
-        return (
-          <article key={i} className="card cut overflow-hidden group zoom reveal" style={{ transitionDelay: `${(i % 3) * 90}ms` }}>
-            {s.image && <div className="relative aspect-[4/3] overflow-hidden"><Img src={s.image} alt={s.title} sizes={sizes} /><div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" /></div>}
-            <div className="p-6 relative">
-              <div className={`icon-chip ${s.image ? "-mt-12 relative shadow-xl" : "mb-4"}`} style={s.image ? { background: "var(--surface)" } : undefined}><Icon size={24} strokeWidth={1.6} /></div>
-              <h3 className="text-xl md:text-2xl font-bold mt-4 mb-2">{s.title}</h3>
-              <p className="opacity-75 leading-8">{s.desc}</p>
-            </div>
-          </article>
-        );
-      })}
-    </div>
-  );
+export async function generateMetadata(): Promise<Metadata> {
+  const c = await getContent();
+  return pageMeta(c, { path: "/", title: c.seo.title, desc: c.seo.description, image: c.seo.ogImage || "/og.png" });
 }
 
 export default async function Home() {
   const c = await getContent();
   const t = c.titles, S = c.sections, G = VARIANT === "golden";
-  const wa = `https://wa.me/${intl(c.contact.whatsapp || c.contact.phone)}`;
-  const tel = `tel:+${intl(c.contact.phone)}`;
+  const { wa, tel } = links(c);
   const on = (k: string) => S[k] !== false;
-  const nav: [string, string][] = ([["about", t.about], ["services", t.services], ["cities", t.cities], ["projects", t.projects], ["gallery", t.gallery], ["videos", t.videos], ["contact", t.contact]] as [string, string][])
-    .filter(([k]) => on(k) && (k !== "cities" || c.cities.length) && (k !== "projects" || c.projects.length) && (k !== "gallery" || c.gallery.length) && (k !== "videos" || c.videos.length));
-  const abs = (u: string) => (u && u.startsWith("/") ? siteUrl() + u : u);
-  const jsonLd = {
-    "@context": "https://schema.org", "@type": "LocalBusiness", name: c.hero.badge || c.seo.title, description: c.seo.description,
-    url: siteUrl(), telephone: "+" + intl(c.contact.phone), image: abs(c.seo.ogImage || c.identity.logo || c.hero.image) || undefined,
-    address: { "@type": "PostalAddress", addressCountry: "SA", addressLocality: c.contact.address },
-    areaServed: c.cities.flatMap((x) => [x.title, ...(x.desc.includes("–") ? x.desc.split("–").map((s) => s.trim()) : [])]).filter(Boolean).map((name) => ({ "@type": "City", name })),
-    sameAs: Object.values(c.social).filter(Boolean),
-  };
-  const socials = Object.entries(c.social).filter(([, v]) => v);
   const points = (c.about.points || "").split("\n").map((s) => s.trim()).filter(Boolean);
 
   return (
-    <div className={G ? "v-golden" : "v-alrowad"}>
-      <Reveal />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-
-      {/* Header */}
-      <header className="fixed top-0 inset-x-0 z-40 backdrop-blur-xl border-b" style={{ background: "color-mix(in srgb, var(--bg) 78%, transparent)", borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)" }}>
-        <div className="max-w-7xl mx-auto px-4 md:px-6 h-[72px] md:h-[84px] flex items-center justify-between gap-4">
-          <a href="#" className="flex items-center gap-3 min-w-0">
-            {c.identity.logo ? <img src={c.identity.logo} alt={c.hero.badge} className="logo" /> : (
-              <span className="flex items-center gap-2.5">
-                <span className="icon-chip !w-10 !h-10 md:!w-12 md:!h-12">{G ? <Pickaxe size={22} /> : <Coffee size={22} />}</span>
-                <span className="display font-bold text-base md:text-xl leading-tight gold-grad">{c.hero.badge}</span>
-              </span>
-            )}
-          </a>
-          <nav className="hidden lg:flex items-center gap-7 text-[15px] font-medium">
-            {nav.map(([k, v]) => <a key={k} href={`#${k}`} className="opacity-85 hover:opacity-100 hover:text-[var(--primary)] transition">{v}</a>)}
-          </nav>
-          <div className="flex items-center gap-2">
-            <a href={tel} className="btn !py-2.5 !px-5 text-sm hidden md:inline-flex whitespace-nowrap"><Phone size={16} />{t.callNow || "اتصل الآن"}</a>
-            <MobileNav links={nav} tel={tel} callLabel={t.callNow || "اتصل الآن"} />
-          </div>
-        </div>
-      </header>
+    <Shell c={c}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={ld(crumbsLd([["الرئيسية", "/"]]))} />
 
       {/* Hero */}
       <section className="relative min-h-[100svh] flex items-end md:items-center overflow-hidden">
@@ -165,7 +116,7 @@ export default async function Home() {
       {/* Services */}
       {on("services") && c.services.length > 0 && (
         <section id="services" className="py-24 md:py-32 px-4" style={{ background: "var(--surface)" }}>
-          <div className="max-w-7xl mx-auto"><Head eyebrow={c.hero.badge} title={t.services} /><PhotoCards items={c.services} icons={SERVICE_ICONS} sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw" /></div>
+          <div className="max-w-7xl mx-auto"><Head eyebrow={c.hero.badge} title={t.services} /><ServiceCards items={c.services} /></div>
         </section>
       )}
 
@@ -176,13 +127,16 @@ export default async function Home() {
           <div className="relative max-w-6xl mx-auto">
             <Head title={t.cities} />
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-              {c.cities.map((x, i) => (
+              {c.cities.map((x, i) => {
+                const pages = c.cityPages.filter((p) => p.name === x.title || x.desc.includes(p.name) || x.title.includes(p.name));
+                return (
                 <div key={i} className="card cut p-6 md:p-8 text-center reveal hover:-translate-y-1 transition" style={{ transitionDelay: `${i * 80}ms` }}>
                   <div className="icon-chip mx-auto mb-4"><MapPin size={24} strokeWidth={1.6} /></div>
-                  <div className="display text-2xl md:text-3xl font-bold">{x.title}</div>
+                  {pages.length === 1 ? <a href={`/cities/${pages[0].slug}`} className="display text-2xl md:text-3xl font-bold block hover:text-[var(--primary)]">{x.title}</a> : <div className="display text-2xl md:text-3xl font-bold">{x.title}</div>}
                   {x.desc && <div className="text-sm md:text-base opacity-75 mt-2">{x.desc}</div>}
+                  {pages.length > 0 && <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 mt-4">{pages.map((p) => <a key={p.slug} href={`/cities/${p.slug}`} className="text-sm gold font-semibold underline-offset-4 hover:underline">{p.title}</a>)}</div>}
                 </div>
-              ))}
+              ); })}
             </div>
           </div>
         </section>
@@ -310,40 +264,6 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="pt-16 pb-28 px-4 border-t" style={{ borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)" }}>
-        <div className="max-w-7xl mx-auto grid gap-10 md:grid-cols-4">
-          <div className="md:col-span-2">
-            {c.identity.logo ? <img src={c.identity.logo} alt={c.hero.badge} className="logo mb-4" /> : <div className="display text-2xl font-bold gold-grad mb-4">{c.hero.badge}</div>}
-            <p className="opacity-70 leading-8 max-w-md">{c.seo.description}</p>
-            {socials.length > 0 && <div className="flex gap-3 mt-5">{socials.map(([k, v]) => { const I = SOCIAL_ICONS[k] || Globe; return <a key={k} href={v} target="_blank" rel="noopener" aria-label={k} className="icon-chip !w-10 !h-10"><I size={18} /></a>; })}</div>}
-          </div>
-          <div>
-            <h4 className="display font-bold text-lg mb-4 gold">روابط سريعة</h4>
-            <ul className="space-y-2 opacity-80">{nav.map(([k, v]) => <li key={k}><a href={`#${k}`} className="hover:text-[var(--primary)]">{v}</a></li>)}</ul>
-          </div>
-          <div>
-            <h4 className="display font-bold text-lg mb-4 gold">{t.contact}</h4>
-            <ul className="space-y-3 opacity-85">
-              <li><a href={tel} className="flex items-center gap-2"><Phone size={16} className="gold" /><span dir="ltr">{c.contact.phone}</span></a></li>
-              <li><a href={wa} className="flex items-center gap-2"><WhatsAppIcon size={16} color="var(--primary)" /><span dir="ltr">{c.contact.whatsapp || c.contact.phone}</span></a></li>
-              {c.contact.email && <li><a href={`mailto:${c.contact.email}`} className="flex items-center gap-2"><Mail size={16} className="gold" />{c.contact.email}</a></li>}
-              <li className="flex items-start gap-2"><MapPin size={16} className="gold mt-1 shrink-0" />{c.contact.address}</li>
-            </ul>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto mt-12 pt-6 border-t text-center text-sm opacity-60" style={{ borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)" }}>{c.footer.text}</div>
-      </footer>
-
-      {/* Floating buttons */}
-      <div className="fixed bottom-5 left-5 z-50 flex flex-col gap-3">
-        <a href={wa} aria-label="تواصل عبر واتساب" target="_blank" rel="noopener" className="wa-pulse w-[60px] h-[60px] rounded-full grid place-items-center shadow-[0_10px_25px_rgba(0,0,0,.35)] hover:scale-110 transition" style={{ background: "#25D366" }}>
-          <WhatsAppIcon size={32} />
-        </a>
-        <a href={tel} aria-label="اتصال" className="w-[60px] h-[60px] rounded-full grid place-items-center shadow-[0_10px_25px_rgba(0,0,0,.35)] hover:scale-110 transition border-2" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--primary) 80%, #fff), var(--primary))", borderColor: "rgba(255,255,255,.25)" }}>
-          <Phone size={26} color="#111" fill="#111" strokeWidth={1.5} />
-        </a>
-      </div>
-    </div>
+    </Shell>
   );
 }

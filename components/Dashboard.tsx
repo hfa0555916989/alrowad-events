@@ -1,11 +1,13 @@
 "use client";
 import { useState } from "react";
 import { upload } from "@vercel/blob/client";
-import type { Content, Item, Media, FontKey } from "../lib/types";
+import type { Content, Item, Media, FontKey, Service, PageSeo, CityPage } from "../lib/types";
+import Analytics from "./Analytics";
+import PasswordForm from "./PasswordForm";
 import { FONT_OPTIONS } from "../lib/fontOptions";
 
-type Tab = "seo" | "identity" | "media" | "content" | "lists";
-const TABS: [Tab, string][] = [["seo", "السيو SEO"], ["identity", "الهوية والشعار"], ["media", "الصور والفيديو"], ["content", "النصوص والتواصل"], ["lists", "الخدمات والمدن والمشاريع"]];
+type Tab = "analytics" | "seo" | "services" | "cityPages" | "identity" | "media" | "content" | "lists" | "password";
+const TABS: [Tab, string][] = [["analytics", "📊 الزوار"], ["seo", "السيو SEO"], ["identity", "الهوية والشعار"], ["media", "الصور والفيديو"], ["services", "الخدمات وصفحاتها"], ["cityPages", "صفحات المدن"], ["content", "النصوص والتواصل"], ["lists", "المدن والمشاريع والأرقام والآراء"], ["password", "🔒 تغيير كلمة المرور"]];
 
 function F({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="block mb-4"><span className="block text-sm font-semibold mb-1">{label}</span>{children}</label>;
@@ -29,6 +31,85 @@ function ImgField({ label, v, on, folder }: { label: string; v: string; on: (s: 
         {v && <button type="button" className="text-red-600 text-sm" onClick={() => on("")}>حذف</button>}
       </div>
     </F>
+  );
+}
+function PageSeoFields({ v, on, folder }: { v: PageSeo; on: (p: Partial<PageSeo>) => void; folder: string }) {
+  return (
+    <div className="border-r-4 border-yellow-500 pr-3 mt-2">
+      <F label="عنوان الصفحة في قوقل (SEO Title)"><T v={v.seoTitle || ""} on={(s) => on({ seoTitle: s })} /></F>
+      <F label="وصف الصفحة في قوقل (Meta Description)"><T area v={v.seoDesc || ""} on={(s) => on({ seoDesc: s })} /></F>
+      <ImgField label="صورة المشاركة لهذه الصفحة (اختياري)" folder={folder} v={v.ogImage || ""} on={(s) => on({ ogImage: s })} />
+    </div>
+  );
+}
+function GalleryField({ v, on, folder }: { v: string[]; on: (x: string[]) => void; folder: string }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <F label="صور الخدمة (يفضل 2–4 صور)">
+      <div className="flex flex-wrap gap-2 mb-2">
+        {v.map((u, i) => <div key={u + i} className="relative"><img src={u} alt="" className="h-20 w-20 object-cover rounded" /><button type="button" className="absolute -top-2 -left-2 bg-red-600 text-white rounded-full w-6 h-6 text-xs" onClick={() => on(v.filter((_, j) => j !== i))}>×</button></div>)}
+      </div>
+      <input type="file" multiple accept="image/*" onChange={async (e) => { const fs = Array.from(e.target.files || []); if (!fs.length) return; setBusy(true); const out = [...v]; for (const f of fs) { try { out.push(await doUpload(f, folder)); on([...out]); } catch (er) { alert("فشل الرفع: " + (er as Error).message); } } setBusy(false); }} />
+      {busy && <span className="mr-2">جاري الرفع...</span>}
+    </F>
+  );
+}
+const slugify = (s: string) => s.toLowerCase().trim().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "") || "service";
+function ServiceList({ items, set }: { items: Service[]; set: (m: Service[]) => void }) {
+  const ch = (i: number, p: Partial<Service>) => set(items.map((x, j) => (j === i ? { ...x, ...p } : x)));
+  return (
+    <div className="space-y-4">
+      {items.map((it, i) => (
+        <details key={i} className="border rounded-lg p-3 bg-gray-50" open={i === 0}>
+          <summary className="font-bold cursor-pointer">{it.title} <span className="text-xs text-gray-500" dir="ltr">/services/{it.slug}</span></summary>
+          <div className="mt-3">
+            <F label="اسم الخدمة"><T v={it.title} on={(s) => ch(i, { title: s })} /></F>
+            <F label="رابط الصفحة (بالإنجليزي بدون مسافات)"><input dir="ltr" className="inp" value={it.slug} onChange={(e) => ch(i, { slug: slugify(e.target.value) })} /></F>
+            <F label="وصف مختصر"><T area v={it.desc} on={(s) => ch(i, { desc: s })} /></F>
+            <F label="تفاصيل الخدمة (كل سطر نقطة)"><T area v={it.points || ""} on={(s) => ch(i, { points: s })} /></F>
+            <F label="عبارة مميزة (اختياري)"><T v={it.highlight || ""} on={(s) => ch(i, { highlight: s })} /></F>
+            <ImgField label="الصورة الرئيسية" folder="services" v={it.image || ""} on={(s) => ch(i, { image: s })} />
+            <GalleryField folder="services" v={it.images || []} on={(x) => ch(i, { images: x })} />
+            <PageSeoFields folder="seo" v={it} on={(p) => ch(i, p)} />
+            <div className="flex gap-3 text-sm mt-2">
+              <button type="button" onClick={() => set(move(items, i, -1))}>⬆️</button>
+              <button type="button" onClick={() => set(move(items, i, 1))}>⬇️</button>
+              <button type="button" className="text-red-600 mr-auto" onClick={() => confirm("حذف الخدمة وصفحتها؟") && set(items.filter((_, j) => j !== i))}>🗑 حذف</button>
+            </div>
+          </div>
+        </details>
+      ))}
+      <button type="button" className="bg-green-600 text-white rounded px-4 py-2" onClick={() => set([...items, { title: "خدمة جديدة", slug: "new-service-" + (items.length + 1), desc: "", points: "", images: [], highlight: "", image: "", seoTitle: "", seoDesc: "", ogImage: "" }])}>+ إضافة خدمة</button>
+    </div>
+  );
+}
+function CityList({ items, set }: { items: CityPage[]; set: (m: CityPage[]) => void }) {
+  const ch = (i: number, p: Partial<CityPage>) => set(items.map((x, j) => (j === i ? { ...x, ...p } : x)));
+  return (
+    <div className="space-y-4">
+      {items.map((it, i) => (
+        <details key={i} className="border rounded-lg p-3 bg-gray-50" open={i === 0}>
+          <summary className="font-bold cursor-pointer">{it.title} <span className="text-xs text-gray-500" dir="ltr">/cities/{it.slug}</span></summary>
+          <div className="mt-3">
+            <F label="اسم المدينة"><T v={it.name} on={(s) => ch(i, { name: s })} /></F>
+            <F label="عنوان الصفحة (H1) — مثل: قهوجيين الرياض"><T v={it.title} on={(s) => ch(i, { title: s })} /></F>
+            <F label="رابط الصفحة (بالإنجليزي بدون مسافات)"><input dir="ltr" className="inp" value={it.slug} onChange={(e) => ch(i, { slug: slugify(e.target.value) })} /></F>
+            <F label="مقدمة قصيرة"><T area v={it.intro} on={(s) => ch(i, { intro: s })} /></F>
+            <F label="النص الرئيسي (اترك سطراً فارغاً بين الفقرات) — اجعله مختلفاً لكل مدينة"><T area v={it.body} on={(s) => ch(i, { body: s })} /></F>
+            <F label="مميزات الخدمة في المدينة (كل سطر نقطة)"><T area v={it.points} on={(s) => ch(i, { points: s })} /></F>
+            <F label="الأحياء والمناطق (افصل بفاصلة)"><T v={it.areas} on={(s) => ch(i, { areas: s })} /></F>
+            <ImgField label="صورة الصفحة" folder="cities" v={it.image} on={(s) => ch(i, { image: s })} />
+            <PageSeoFields folder="seo" v={it} on={(p) => ch(i, p)} />
+            <div className="flex gap-3 text-sm mt-2">
+              <button type="button" onClick={() => set(move(items, i, -1))}>⬆️</button>
+              <button type="button" onClick={() => set(move(items, i, 1))}>⬇️</button>
+              <button type="button" className="text-red-600 mr-auto" onClick={() => confirm("حذف صفحة المدينة؟") && set(items.filter((_, j) => j !== i))}>🗑 حذف</button>
+            </div>
+          </div>
+        </details>
+      ))}
+      <button type="button" className="bg-green-600 text-white rounded px-4 py-2" onClick={() => set([...items, { slug: "city-" + (items.length + 1), name: "", title: "قهوجيين ", intro: "", body: "", points: "", areas: "", image: "", seoTitle: "", seoDesc: "", ogImage: "" }])}>+ إضافة مدينة</button>
+    </div>
   );
 }
 const move = <X,>(a: X[], i: number, d: number) => { const b = [...a]; const j = i + d; if (j < 0 || j >= b.length) return b; [b[i], b[j]] = [b[j], b[i]]; return b; };
@@ -88,7 +169,7 @@ const TITLE_LABELS: Record<string, string> = { about: "من نحن", services: "
 
 export default function Dashboard({ initial, blobReady }: { initial: Content; blobReady: boolean }) {
   const [c, setC] = useState<Content>(initial);
-  const [tab, setTab] = useState<Tab>("seo");
+  const [tab, setTab] = useState<Tab>("analytics");
   const [msg, setMsg] = useState("");
   const up = <K extends keyof Content>(k: K, v: Partial<Content[K]>) => setC((p) => ({ ...p, [k]: Array.isArray(v) ? v : { ...(p[k] as object), ...v } }));
   async function save() {
@@ -111,24 +192,30 @@ export default function Dashboard({ initial, blobReady }: { initial: Content; bl
       <nav className="flex overflow-x-auto bg-white border-b">
         {TABS.map(([k, v]) => <button key={k} onClick={() => setTab(k)} className={`px-4 py-3 whitespace-nowrap ${tab === k ? "border-b-4 border-yellow-500 font-bold" : ""}`}>{v}</button>)}
       </nav>
-      <div className="max-w-4xl mx-auto p-4">
+      <div className={`${tab === "analytics" ? "max-w-6xl" : "max-w-4xl"} mx-auto p-4`}>
         <div className="bg-white rounded-xl shadow p-5">
           {tab === "seo" && (<>
             <F label="عنوان الموقع (Title)"><T v={c.seo.title} on={(s) => up("seo", { title: s })} /></F>
             <F label="الوصف (Meta Description)"><T area v={c.seo.description} on={(s) => up("seo", { description: s })} /></F>
             <F label="الكلمات المفتاحية (افصل بفاصلة)"><T area v={c.seo.keywords} on={(s) => up("seo", { keywords: s })} /></F>
             <ImgField label="صورة المشاركة OG Image (1200×630 مفضل)" folder="seo" v={c.seo.ogImage} on={(s) => up("seo", { ogImage: s })} />
+            <h3 className="font-bold mt-6 mb-1">صفحة من نحن (/about)</h3>
+            <PageSeoFields folder="seo" v={c.pages.about} on={(p) => up("pages", { about: { ...c.pages.about, ...p } })} />
+            <h3 className="font-bold mt-6 mb-1">صفحة تواصل معنا (/contact)</h3>
+            <PageSeoFields folder="seo" v={c.pages.contact} on={(p) => up("pages", { contact: { ...c.pages.contact, ...p } })} />
+            <p className="text-sm text-gray-600 mt-2">إعدادات SEO لكل خدمة في تبويب «الخدمات وصفحاتها»، ولكل مدينة في تبويب «صفحات المدن». خريطة الموقع: <a className="underline" href="/sitemap.xml" target="_blank">/sitemap.xml</a></p>
             <h3 className="font-bold mt-6 mb-3">عناوين الأقسام</h3>
             {Object.keys(TITLE_LABELS).map((k) => <F key={k} label={TITLE_LABELS[k]}><T v={c.titles[k] || ""} on={(s) => up("titles", { [k]: s })} /></F>)}
           </>)}
           {tab === "identity" && (<>
+            <p className="text-sm text-gray-600 mb-2">الشعار الافتراضي هو شعار «الرواد» المصمم للموقع. ارفع شعاراً هنا لاستبداله، أو احذفه للرجوع للافتراضي. تحميل الشعار الافتراضي: <a className="underline" href="/logo.png" target="_blank">PNG داكن</a> · <a className="underline" href="/logo-light.png" target="_blank">PNG فاتح</a> · <a className="underline" href="/logo.svg" target="_blank">SVG</a></p>
             <ImgField label="الشعار (Logo)" folder="identity" v={i.logo} on={(s) => up("identity", { logo: s })} />
             <ImgField label="أيقونة المتصفح (Favicon)" folder="identity" v={i.favicon} on={(s) => up("identity", { favicon: s })} />
             <F label={`حجم الشعار — كمبيوتر: ${i.logoSizeDesktop}px`}><input type="range" min={24} max={220} value={i.logoSizeDesktop} onChange={(e) => up("identity", { logoSizeDesktop: +e.target.value })} className="w-full" /></F>
             <F label={`حجم الشعار — جوال: ${i.logoSizeMobile}px`}><input type="range" min={20} max={160} value={i.logoSizeMobile} onChange={(e) => up("identity", { logoSizeMobile: +e.target.value })} className="w-full" /></F>
             <div className="flex gap-6 items-end p-4 rounded mb-4" style={{ background: i.background }}>
-              <div className="text-center text-xs text-white">كمبيوتر<br />{i.logo ? <img src={i.logo} style={{ height: i.logoSizeDesktop }} alt="" /> : <span style={{ fontSize: i.logoSizeDesktop / 3, color: i.primary }}>الشعار</span>}</div>
-              <div className="text-center text-xs text-white">جوال<br />{i.logo ? <img src={i.logo} style={{ height: i.logoSizeMobile }} alt="" /> : <span style={{ fontSize: i.logoSizeMobile / 3, color: i.primary }}>الشعار</span>}</div>
+              <div className="text-center text-xs text-white">كمبيوتر<br />{i.logo ? <img src={i.logo} style={{ height: i.logoSizeDesktop }} alt="" /> : <img src="/logo.svg" style={{ height: i.logoSizeDesktop }} alt="" />}</div>
+              <div className="text-center text-xs text-white">جوال<br />{i.logo ? <img src={i.logo} style={{ height: i.logoSizeMobile }} alt="" /> : <img src="/logo.svg" style={{ height: i.logoSizeMobile }} alt="" />}</div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {([["primary", "اللون الأساسي"], ["secondary", "اللون الثانوي"], ["background", "الخلفية"], ["surface", "خلفية الأقسام"], ["text", "النص"]] as const).map(([k, l]) => (
@@ -172,9 +259,12 @@ export default function Dashboard({ initial, blobReady }: { initial: Content; bl
             <h3 className="font-bold mt-6 mb-3">إظهار / إخفاء الأقسام</h3>
             <div className="flex flex-wrap gap-4">{["about", "stats", "services", "cities", "projects", "why", "gallery", "videos", "testimonials"].map((k) => <label key={k} className="flex gap-1"><input type="checkbox" checked={c.sections[k] !== false} onChange={(e) => up("sections", { [k]: e.target.checked })} />{TITLE_LABELS[k]}</label>)}</div>
           </>)}
+          {tab === "analytics" && <Analytics names={Object.fromEntries([...c.services.map((x) => [`/services/${x.slug}`, `خدمة: ${x.title}`]), ...c.cityPages.map((x) => [`/cities/${x.slug}`, x.title])])} />}
+          {tab === "cityPages" && (<><p className="text-sm text-gray-600 mb-3">كل مدينة لها صفحة خاصة تظهر في قوقل (مثل «قهوجيين الرياض»). اكتب لكل مدينة نصاً مختلفاً حتى لا يعتبره قوقل محتوى مكرراً. لا تنسَ «حفظ التغييرات».</p><CityList items={c.cityPages} set={(m) => up("cityPages", m)} /></>)}
+          {tab === "password" && <PasswordForm />}
+          {tab === "services" && (<><p className="text-sm text-gray-600 mb-3">كل خدمة لها صفحة خاصة تظهر في قوقل. لا تنسَ الضغط على «حفظ التغييرات».</p><ServiceList items={c.services} set={(m) => up("services", m)} /></>)}
           {tab === "lists" && (<>
-            <h3 className="font-bold mb-3">الخدمات</h3><ItemList folder="services" withImage items={c.services} set={(m) => up("services", m)} />
-            <h3 className="font-bold mt-8 mb-3">المدن / مناطق الخدمة</h3><ItemList folder="cities" items={c.cities} set={(m) => up("cities", m)} />
+            <h3 className="font-bold mb-3">المدن / مناطق الخدمة</h3><ItemList folder="cities" items={c.cities} set={(m) => up("cities", m)} />
             <h3 className="font-bold mt-8 mb-3">المشاريع</h3><ItemList folder="projects" withImage items={c.projects} set={(m) => up("projects", m)} />
             <h3 className="font-bold mt-8 mb-3">لماذا نحن</h3><ItemList folder="why" items={c.why} set={(m) => up("why", m)} />
             <h3 className="font-bold mt-8 mb-3">الأرقام والإحصائيات (العنوان = الرقم مثل 500+، الوصف = التسمية)</h3><ItemList folder="stats" items={c.stats} set={(m) => up("stats", m)} />

@@ -1,8 +1,13 @@
 export type Item = { title: string; desc: string; image?: string };
+export type PageSeo = { seoTitle: string; seoDesc: string; ogImage: string };
+export type Service = Item & PageSeo & { slug: string; points: string; images: string[]; highlight: string };
+export type CityPage = PageSeo & { slug: string; name: string; title: string; intro: string; body: string; points: string; image: string; areas: string };
 export type Media = { url: string; caption: string; type?: string };
 export type FontKey = "tajawal" | "cairo" | "almarai" | "ibmplex" | "readex" | "elmessiri";
 export type Content = {
+  version: number;
   seo: { title: string; description: string; keywords: string; ogImage: string };
+  pages: { about: PageSeo; contact: PageSeo };
   titles: Record<string, string>;
   identity: {
     logo: string; favicon: string; primary: string; secondary: string; background: string; surface: string; text: string;
@@ -11,7 +16,8 @@ export type Content = {
   hero: { badge: string; title: string; subtitle: string; cta: string; image: string };
   about: { title: string; text: string; image: string; points: string };
   cta: { title: string; text: string; image: string };
-  services: Item[];
+  services: Service[];
+  cityPages: CityPage[];
   cities: Item[];
   projects: Item[];
   why: Item[];

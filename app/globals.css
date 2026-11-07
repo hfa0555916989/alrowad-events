@@ -28,3 +28,16 @@ h1, h2, h3, .display { font-family: var(--heading); }
 @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(37,211,102,.55);} 70% { box-shadow: 0 0 0 16px rgba(37,211,102,0);} 100% { box-shadow: 0 0 0 0 rgba(37,211,102,0);} }
 .wa-pulse { animation: pulse-ring 2.2s infinite; }
 .inp { width:100%; background:#fff; color:#111; border:1px solid #ccc; border-radius:.5rem; padding:.5rem .75rem; }
+.brand-logo { --lh: var(--logo-m); display:inline-flex; align-items:center; gap: calc(var(--lh) * .22); height: var(--lh); }
+@media (min-width: 768px) { .brand-logo { --lh: var(--logo-d); } }
+.brand-emblem { height: 100%; width: auto; flex-shrink: 0; filter: drop-shadow(0 4px 10px rgba(212,175,55,.25)); }
+.brand-words { display:flex; flex-direction:column; justify-content:center; line-height:1.05; white-space:nowrap; }
+.brand-ar { font-family: var(--heading); font-weight: 700; font-size: calc(var(--lh) * .40); line-height: 1.3; padding-bottom: .22em; margin-bottom: -.2em; }
+.brand-sub { font-family: var(--heading); font-weight: 600; font-size: calc(var(--lh) * .22); margin-top: calc(var(--lh) * .04); }
+.brand-en { font-family: var(--body); font-size: calc(var(--lh) * .105); letter-spacing: .06em; margin-top: calc(var(--lh) * .06); font-weight: 600; }
+@media (max-width: 380px) { .brand-en { display:none; } }
+.pattern-soft { background-image: radial-gradient(color-mix(in srgb, var(--primary) 9%, transparent) 1px, transparent 1px); background-size: 22px 22px; }
+.nav-drop { position: relative; }
+.nav-drop > .drop { position:absolute; top:100%; right:-1rem; min-width: 14rem; padding:.5rem; opacity:0; visibility:hidden; transform: translateY(6px); transition: .2s; }
+.nav-drop:hover > .drop, .nav-drop:focus-within > .drop { opacity:1; visibility:visible; transform:none; }
+.prose-ar p { margin-bottom: 1.25rem; }
