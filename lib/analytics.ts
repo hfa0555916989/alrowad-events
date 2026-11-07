@@ -1,74 +1,32 @@
+import { createHmac, randomBytes } from "crypto";
 import { list, put, del } from "@vercel/blob";
+import {
+  applyHit, dayKey, emptyDay, hourKey, mergeAgg, normalizeDay,
+  type DayAgg, type Hit,
+} from "./analytics-model";
 
-/** Aggregated, anonymous counters. No IPs, no user agents, no personal data are stored. */
-export type Counts = { v: number; pv: number };
-/** v = unique visitors (or sessions for sources), pv = page views. e = conversion events (wa / call), es = events by "event|source". */
-export type DayAgg = {
-  d: string; v: number; pv: number;
-  c: Record<string, Counts>; r: Record<string, Counts>; ci: Record<string, Counts>; p: Record<string, Counts>;
-  s: Record<string, Counts>; rd: Record<string, Counts>; cp: Record<string, Counts>;
-  e: Record<string, number>; es: Record<string, number>;
-};
-const MAPS = ["c", "r", "ci", "p", "s", "rd", "cp"] as const;
-const NUMS = ["e", "es"] as const;
+export {
+  dayKey, hourKey, classify, parseUA, BOT_RE, screenBucket, langTag, viewDay, facetsFrom,
+  hasFilter, prevPeriod, daysInclusive, legacyPageviews, totalsOf, metrics,
+} from "./analytics-model";
+export type { DayAgg, Hit, Filter, Facets } from "./analytics-model";
+
 const PREFIX = "analytics/";
-export const TZ = "Asia/Riyadh";
-export const dayKey = (t = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(t);
-const empty = (d: string): DayAgg => ({ d, v: 0, pv: 0, c: {}, r: {}, ci: {}, p: {}, s: {}, rd: {}, cp: {}, e: {}, es: {} });
-const bump = (m: Record<string, Counts>, k: string, nv: boolean) => { const x = (m[k] ||= { v: 0, pv: 0 }); x.pv++; if (nv) x.v++; };
+const PRESENCE = "presence/";
 
-export function mergeAgg(a: DayAgg, b: DayAgg) {
-  a.v += b.v || 0; a.pv += b.pv || 0;
-  for (const key of MAPS) for (const [k, x] of Object.entries(b[key] || {})) { const y = ((a[key] ||= {})[k] ||= { v: 0, pv: 0 }); y.v += x.v || 0; y.pv += x.pv || 0; }
-  for (const key of NUMS) for (const [k, n] of Object.entries(b[key] || {})) (a[key] ||= {})[k] = (a[key][k] || 0) + (n || 0);
-  return a;
-}
-
-export const BOT_RE = /bot|crawl|spider|slurp|bing|google|yandex|baidu|duckduck|facebookexternalhit|embedly|preview|headless|lighthouse|pingdom|uptime|monitor|curl|wget|python|axios|node-fetch|go-http|java\/|scrapy|petal|semrush|ahrefs|mj12|dotbot|gptbot|claude|perplexity|bytespider/i;
-
-/* Per-instance buffer, written as small immutable "delta" blobs (no read-modify-write => safe under concurrency).
-   Low traffic: every hit is flushed immediately. Bursts: flushed at most every 20s per instance. */
 let buf: Record<string, DayAgg> = {};
 let lastFlush = 0;
 let flushing: Promise<void> | null = null;
 
-export type Hit = { path: string; country: string; region: string; city: string; newVisitor: boolean; newPage: boolean; landing: boolean; src: string; ref: string; camp: string };
-export function record(hit: Hit) {
-  const d = dayKey();
-  const a = (buf[d] ||= empty(d));
-  a.pv++; if (hit.newVisitor) a.v++;
-  bump(a.c, hit.country, hit.newVisitor);
-  bump(a.r, `${hit.country}|${hit.region}`, hit.newVisitor);
-  bump(a.ci, `${hit.country}|${hit.city}`, hit.newVisitor);
-  bump(a.p, hit.path, hit.newPage);
-  // traffic sources: v = visits (sessions that started from this source), pv = page views during those sessions
-  bump(a.s, hit.src, hit.landing);
-  if (hit.ref) bump(a.rd, hit.ref, hit.landing);
-  if (hit.camp) bump(a.cp, hit.camp, hit.landing);
-}
-export function recordEvent(ev: string, src: string, float: boolean) {
-  const d = dayKey();
-  const a = (buf[d] ||= empty(d));
-  a.e[ev] = (a.e[ev] || 0) + 1;
-  if (float) a.e[`${ev}_float`] = (a.e[`${ev}_float`] || 0) + 1;
-  a.es[`${ev}|${src}`] = (a.es[`${ev}|${src}`] || 0) + 1;
+/** Buffer a hit for the Riyadh day of `now`. Flushed as an immutable delta; nothing here stores an IP or visitor id. */
+export function ingest(hit: Hit, now = new Date()) {
+  const d = dayKey(now);
+  const a = (buf[d] ||= emptyDay(d));
+  applyHit(a, { ...hit, hour: hourKey(now) });
 }
 
-/* ---- traffic source classification ---- */
-export const SOURCES = ["google", "gads", "search", "snap", "ig", "tiktok", "x", "fb", "wa", "yt", "email", "direct", "other"] as const;
-const BY_UTM: [RegExp, string][] = [[/snap/i, "snap"], [/insta|^ig$/i, "ig"], [/tik/i, "tiktok"], [/twitter|^x$|x\.com/i, "x"], [/face|^fb$|meta/i, "fb"], [/whats|^wa$/i, "wa"], [/youtu/i, "yt"], [/mail|newsletter/i, "email"], [/google/i, "google"], [/bing|yahoo|duck|yandex/i, "search"]];
-const BY_HOST: [RegExp, string][] = [[/(^|\.)google\.[a-z.]+$/, "google"], [/(^|\.)(bing|yahoo|duckduckgo|yandex|baidu|ecosia|brave)\.[a-z.]+$/, "search"], [/(^|\.)snapchat\.com$/, "snap"], [/(^|\.)instagram\.com$/, "ig"], [/(^|\.)tiktok\.com$/, "tiktok"], [/(^|\.)(t\.co|twitter\.com|x\.com)$/, "x"], [/(^|\.)(facebook\.com|fb\.com|fb\.me|messenger\.com)$/, "fb"], [/(^|\.)(whatsapp\.com|wa\.me)$/, "wa"], [/(^|\.)(youtube\.com|youtu\.be)$/, "yt"], [/mail\./, "email"]];
-export function classify(ref: string, utmSource: string, utmMedium: string) {
-  if (utmSource) {
-    if (/google/i.test(utmSource) && /cpc|ppc|paid|ads/i.test(utmMedium)) return "gads";
-    for (const [re, k] of BY_UTM) if (re.test(utmSource)) return k;
-    return "other";
-  }
-  if (!ref) return "direct";
-  for (const [re, k] of BY_HOST) if (re.test(ref)) return k;
-  return "other";
-}
 export async function maybeFlush(force = false) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return;
   if (flushing) return flushing;
   if (!force && Date.now() - lastFlush < 20_000) return;
   const data = buf; buf = {};
@@ -87,7 +45,6 @@ export async function maybeFlush(force = false) {
   return flushing;
 }
 
-/** Called via after(): flush now, or — if throttled — wait out the window and flush, so buffered hits are not lost. */
 export async function flushSoon() {
   await maybeFlush();
   if (!Object.keys(buf).length) return;
@@ -95,36 +52,71 @@ export async function flushSoon() {
   await new Promise((r) => setTimeout(r, wait));
   if (Object.keys(buf).length) await maybeFlush(true);
 }
-async function listAll() {
-  const out: { pathname: string; url: string }[] = [];
+
+type BlobRef = { pathname: string; url: string; uploadedAt: Date };
+async function listPrefix(prefix: string) {
+  const out: BlobRef[] = [];
   let cursor: string | undefined;
   do {
-    const r = await list({ prefix: PREFIX, cursor, limit: 1000 });
-    out.push(...r.blobs.map((b) => ({ pathname: b.pathname, url: b.url })));
+    const r = await list({ prefix, cursor, limit: 1000 });
+    out.push(...r.blobs.map((b) => ({ pathname: b.pathname, url: b.url, uploadedAt: b.uploadedAt })));
     cursor = r.hasMore ? r.cursor : undefined;
   } while (cursor);
   return out;
 }
+
+const fileCache = new Map<string, DayAgg>();
+const CACHE_MAX = 1500;
+function remember(url: string, day: DayAgg) {
+  if (fileCache.has(url)) fileCache.delete(url);
+  fileCache.set(url, day);
+  while (fileCache.size > CACHE_MAX) {
+    const first = fileCache.keys().next().value;
+    if (!first) break;
+    fileCache.delete(first);
+  }
+}
 async function fetchJson(url: string): Promise<DayAgg | null> {
-  try { const r = await fetch(url, { cache: "no-store" }); return r.ok ? ((await r.json()) as DayAgg) : null; } catch { return null; }
+  const hit = fileCache.get(url);
+  if (hit) { fileCache.delete(url); fileCache.set(url, hit); return hit; }
+  try {
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) return null;
+    const day = normalizeDay(await r.json());
+    remember(url, day);
+    return day;
+  } catch { return null; }
 }
 async function pool<T, R>(xs: T[], n: number, f: (x: T) => Promise<R>) {
-  const out: R[] = []; let i = 0;
-  await Promise.all(Array.from({ length: Math.min(n, xs.length) }, async () => { while (i < xs.length) { const k = i++; out[k] = await f(xs[k]); } }));
+  const out: R[] = new Array(xs.length);
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, xs.length) }, async () => {
+    while (i < xs.length) { const k = i++; out[k] = await f(xs[k]); }
+  }));
   return out;
 }
 
-/** Load per-day aggregates for [from, to] (YYYY-MM-DD, inclusive). Past days with many deltas are compacted into one file. */
+/** Load per-day aggregates for [from, to]. Past days with many deltas are compacted. Existing files are never discarded without a full merged copy. */
 export async function loadRange(from: string, to: string) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return [] as DayAgg[];
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    const keys = Object.keys(buf).sort();
+    while (keys.length > 4) delete buf[keys.shift()!];
+    return Object.values(buf).filter((d) => d.d >= from && d.d <= to).map((d) => normalizeDay(d)).sort((a, b) => a.d.localeCompare(b.d));
+  }
   await maybeFlush(true);
-  const files = (await listAll()).filter((b) => { const d = b.pathname.slice(PREFIX.length, PREFIX.length + 10); return d >= from && d <= to; });
-  const byDay = new Map<string, { pathname: string; url: string }[]>();
-  for (const f of files) { const d = f.pathname.slice(PREFIX.length, PREFIX.length + 10); byDay.set(d, [...(byDay.get(d) || []), f]); }
+  const files = (await listPrefix(PREFIX)).filter((b) => {
+    const d = b.pathname.slice(PREFIX.length, PREFIX.length + 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(d) && d >= from && d <= to;
+  });
+  const byDay = new Map<string, BlobRef[]>();
+  for (const f of files) {
+    const d = f.pathname.slice(PREFIX.length, PREFIX.length + 10);
+    byDay.set(d, [...(byDay.get(d) || []), f]);
+  }
   const today = dayKey();
   const days = await pool([...byDay.entries()], 8, async ([d, fs]) => {
-    const parts = (await pool(fs, 12, (f) => fetchJson(f.url))).filter(Boolean) as DayAgg[];
-    const agg = parts.reduce((a, b) => mergeAgg(a, b), empty(d));
+    const parts = (await pool(fs, 12, (f) => fetchJson(f.url))).filter((x): x is DayAgg => !!x);
+    const agg = parts.reduce((a, b) => mergeAgg(a, b), emptyDay(d));
     if (d < today && fs.length > 1 && parts.length === fs.length) {
       try {
         await put(`${PREFIX}${d}/day-${Date.now()}.json`, JSON.stringify(agg), { access: "public", addRandomSuffix: true, contentType: "application/json" });
@@ -135,8 +127,77 @@ export async function loadRange(from: string, to: string) {
   });
   return days.sort((a, b) => a.d.localeCompare(b.d));
 }
+
 export async function deleteRange(from: string, to: string) {
-  const files = (await listAll()).filter((b) => { const d = b.pathname.slice(PREFIX.length, PREFIX.length + 10); return d >= from && d <= to; });
+  const files = (await listPrefix(PREFIX)).filter((b) => {
+    const d = b.pathname.slice(PREFIX.length, PREFIX.length + 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(d) && d >= from && d <= to;
+  });
   if (files.length) await del(files.map((f) => f.url));
   return files.length;
+}
+
+export type Presence = { path: string; country: string; region: string; city: string; device: string; src: string; t: number };
+
+/** Daily-salted hash of the random cookie id. The raw id is never written to storage. */
+export function presenceId(vid: string, day: string) {
+  const pepper = process.env.ADMIN_SECRET || process.env.ADMIN_PASSWORD || "rv-presence";
+  return createHmac("sha256", pepper).update(`presence|${day}|${vid}`).digest("hex").slice(0, 24);
+}
+export function newVisitorId() {
+  return randomBytes(16).toString("hex");
+}
+
+const presenceAt = new Map<string, number>();
+const memPresence = new Map<string, Presence>();
+export async function touchPresence(key: string, info: Presence) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) { memPresence.set(key, info); return; }
+  if (!/^[a-f0-9]{16,64}$/.test(key)) return;
+  const now = Date.now();
+  if (now - (presenceAt.get(key) || 0) < 20_000) return;
+  presenceAt.set(key, now);
+  try {
+    await put(`${PRESENCE}${key}.json`, JSON.stringify(info), { access: "public", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json" });
+  } catch (e) {
+    presenceAt.delete(key);
+    throw e;
+  }
+}
+
+export async function loadLive() {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    const now = Date.now();
+    for (const [k, p] of memPresence) if (now - p.t > 5 * 60 * 1000) memPresence.delete(k);
+    return [...memPresence.values()];
+  }
+  const now = Date.now();
+  const files = (await listPrefix(PRESENCE)).filter((b) => b.pathname.startsWith(PRESENCE));
+  const fresh: BlobRef[] = [];
+  const stale: BlobRef[] = [];
+  for (const b of files) {
+    const t = new Date(b.uploadedAt).getTime();
+    if (!Number.isFinite(t)) continue;
+    if (now - t <= 5 * 60 * 1000) fresh.push(b);
+    else if (now - t > 30 * 60 * 1000) stale.push(b);
+  }
+  if (stale.length) await del(stale.map((b) => b.url)).catch((e) => console.error("presence cleanup", e));
+  fresh.sort((a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt));
+  const bodies = await pool(fresh.slice(0, 40), 8, async (f) => {
+    try {
+      const r = await fetch(f.url, { cache: "no-store" });
+      if (!r.ok) return null;
+      const j = await r.json();
+      const path = String(j?.path || "/").slice(0, 120);
+      return {
+        path: path.startsWith("/") ? path : "/",
+        country: String(j?.country || "XX").slice(0, 2),
+        region: String(j?.region || "?").slice(0, 40),
+        city: String(j?.city || "?").slice(0, 60),
+        device: String(j?.device || ""),
+        src: String(j?.src || ""),
+        t: new Date(f.uploadedAt).getTime(),
+      } satisfies Presence;
+    } catch { return null; }
+  });
+  return bodies.filter((x): x is Presence => !!x);
 }
